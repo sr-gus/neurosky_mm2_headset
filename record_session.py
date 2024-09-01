@@ -28,11 +28,12 @@ def main():
             session_manager.start_new_session(user_id)
             print('Sesión iniciada. Presiona Ctrl+C para detener.')
 
-            try:
-                session_manager.initialize_plot()  
-                session_manager.end_session()
-            except KeyboardInterrupt:
-                end_session()
+            if session_manager.is_collecting:
+                try:
+                    session_manager.initialize_plot()  
+                    session_manager.end_session()
+                except KeyboardInterrupt:
+                    end_session()
 
         elif choice == '2':
             user_id = input('Ingresa el nombre del usuario: ')
@@ -43,7 +44,7 @@ def main():
                 continue
 
             for idx, session in enumerate(sessions):
-                print(f'{idx + 1}. Iniciada el {session['start_time']} - Finalizada el {session['end_time']}')
+                print(f'{idx + 1}. Iniciada el {session["start_time"]} - Finalizada el {session["end_time"]}')
 
             user_input = input('Selecciona una sesión para ver los datos: ')
             while not user_input.isdigit():
@@ -55,6 +56,8 @@ def main():
             if session_data:
                 print('1. Exportar a CSV')
                 print('2. Ver gráfica')
+                print('3. Ver espectro de frecuencia')
+                print('4. Ver espectrograma')
 
                 user_input = input('Selecciona una opción: ')
                 while not user_input.isdigit():
@@ -70,6 +73,13 @@ def main():
 
                 elif export_choice == 2:
                     session_manager.plot_session_data(session_data)
+
+                elif export_choice == 3:
+                    session_manager.plot_frequency_spectrum(session_data)
+
+                elif export_choice == 4:
+                    session_manager.plot_spectrogram(session_data)
+
             else: 
                 print('Error al procesar la sesión')
 
