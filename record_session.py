@@ -21,9 +21,35 @@ def main():
         print('1. Iniciar nueva sesión')
         print('2. Ver datos de sesiones anteriores')
         print('3. Salir')
-        choice = input('Selecciona una opción: ')
+
+        user_input = input('Selecciona una opción: ')
+        while not user_input.isdigit():
+            print('Entrada inválida')
+            user_input = input('Selecciona una opción: ')
+
+        choice = user_input
 
         if choice == '1':
+            print('Selecciona el tipo de gráfico a mostrar:')
+            print('1. Señal cruda en tiempo real')
+            print('2. Espectro de Potencia en tiempo real')
+            print('3. Espectrograma en tiempo real')
+
+            user_input = input('Selecciona una opción: ')
+            while not user_input.isdigit():
+                print('Entrada inválida')
+                user_input = input('Selecciona una opción: ')
+
+            plot_choice = user_input
+
+            if plot_choice == '1':
+                session_manager.set_plot_type('raw')
+            elif plot_choice == '2':
+                session_manager.set_plot_type('frequency')
+            elif plot_choice == '3':
+                session_manager.set_plot_type('spectrogram')
+
+
             user_id = input('Ingresa el nombre del usuario: ')
             session_manager.start_new_session(user_id)
             print('Sesión iniciada. Presiona Ctrl+C para detener.')
@@ -44,7 +70,7 @@ def main():
                 continue
 
             for idx, session in enumerate(sessions):
-                print(f'{idx + 1}. Iniciada el {session["start_time"]} - Finalizada el {session["end_time"]}')
+                print(f'{idx + 1}. Iniciada el {session['start_time']} - Finalizada el {session['end_time']}')
 
             user_input = input('Selecciona una sesión para ver los datos: ')
             while not user_input.isdigit():
@@ -56,7 +82,7 @@ def main():
             if session_data:
                 print('1. Exportar a CSV')
                 print('2. Ver gráfica')
-                print('3. Ver espectro de frecuencia')
+                print('3. Ver Espectro de Potencia')
                 print('4. Ver espectrograma')
                 print('5. Ver espectro de potencia con sliders')
                 print('6. Ver espectrograma con sliders')
@@ -77,7 +103,7 @@ def main():
                     session_manager.plot_session_data(session_data)
 
                 elif export_choice == 3:
-                    session_manager.plot_frequency_spectrum(session_data)
+                    session_manager.plot_power_spectrum(session_data)
 
                 elif export_choice == 4:
                     session_manager.plot_spectrogram(session_data)
