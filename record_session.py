@@ -58,6 +58,8 @@ def main():
                 print('2. Ver gráfica')
                 print('3. Ver espectro de frecuencia')
                 print('4. Ver espectrograma')
+                print('5. Ver espectro de potencia con sliders')
+                print('6. Ver espectrograma con sliders')
 
                 user_input = input('Selecciona una opción: ')
                 while not user_input.isdigit():
@@ -79,6 +81,12 @@ def main():
 
                 elif export_choice == 4:
                     session_manager.plot_spectrogram(session_data)
+
+                elif export_choice == 5:
+                    session_manager.plot_power_spectrum_with_sliders(session_data)
+
+                elif export_choice == 6:
+                    session_manager.plot_spectrogram_with_sliders(session_data)
 
             else: 
                 print('Error al procesar la sesión')

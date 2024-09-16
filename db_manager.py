@@ -55,6 +55,19 @@ class MongoDBManager:
             print(f"Error al guardar datos en MongoDB: {e}")
         except Exception as e:
             print(f"Error inesperado al guardar datos en MongoDB: {e}")
+    
+    def save_data_batch(self, session_id, data_batch):
+        if self.client is None:
+            return
+        try:
+            self.sessions.update_one(
+                {'_id': session_id},
+                {'$push': {'data': {'$each': data_batch}}}
+            )
+        except errors.OperationFailure as e:
+            print(f"Error al guardar datos en MongoDB: {e}")
+        except Exception as e:
+            print(f"Error inesperado al guardar datos en MongoDB: {e}")
 
     def get_user_sessions(self, user_id):
         if self.client is None:
