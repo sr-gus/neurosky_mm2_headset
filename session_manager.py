@@ -6,7 +6,7 @@ import threading
 import csv
 import numpy as np
 from numpy.fft import fft, rfft
-from scipy.signal import spectrogram
+from scipy.signal import spectrogram, butter, filtfilt
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from matplotlib.dates import DateFormatter
@@ -19,6 +19,20 @@ ZERO_THRESHOLD = 1000
 MAX_INTERVAL_MINUTES = 10
 BATCH_SIZE = 1000
 GRAPH_INTERVAL = 1000
+X_AXIS_TYPE = 'log'
+NORMALIZE_SXX = False
+
+def butter_bandpass(lowcut, highcut, fs, order=4):
+    nyquist = 0.5 * fs  # Frecuencia de Nyquist
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def apply_bandpass_filter(data, lowcut, highcut, fs, order=4):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = filtfilt(b, a, data)
+    return y
 
 class SessionManager:
     def __init__(self, db_manager, device_port):
@@ -31,6 +45,10 @@ class SessionManager:
         self.zero_count = 0
         self.collection_thread = None
         self.plot_type = 'raw'
+        self._data_count = 0
+        self.max_Sxx_value = -np.inf
+        self.power_lowcut = 12.0 
+        self.power_highcut = 30.0  
 
     def connect_interface(self):
         try:
@@ -105,6 +123,7 @@ class SessionManager:
                         self.db_manager.save_data_batch(self.current_session_id, data_batch)
                         data_batch.clear()
 
+                    self._data_count += 1
                     time.sleep(1 / SAMPLE_ATTEMPT_FREQ)
 
                 except serial.SerialException as e:
@@ -153,29 +172,54 @@ class SessionManager:
         elif self.plot_type == 'frequency':
             ax.set_title('Espectro de Potencia en Tiempo Real')
             ax.set_xlabel('Frecuencia (Hz)')
-            ax.set_ylabel('Amplitud')
+            ax.set_ylabel('Amplitud (dB)') 
 
             def update_frequency(frame):
                 if len(self.raw_data) >= GRAPH_INTERVAL:
                     raw_values = np.array(self.raw_data[-GRAPH_INTERVAL:])
+                    self._data_count = 0
                     Fs = SAMPLE_ATTEMPT_FREQ
+                    filtered_signal = apply_bandpass_filter(raw_values, self.power_lowcut, self.power_highcut, Fs, 6)
+
                     dt = 1 / Fs  
-                    N = raw_values.shape[0]
+                    N = filtered_signal.shape[0]
                     T = N * dt
 
-                    xf = fft(raw_values - raw_values.mean())  
-                    Sxx = 2 * dt ** 2 / T * (xf * xf.conj())  
-                    Sxx = Sxx[:int(len(raw_values) / 2)] 
+                    print(f'Filtered mean: {filtered_signal.mean()}')
+
+                    xf = fft(filtered_signal - filtered_signal.mean())
+                    Sxx = 2 * dt ** 2 / T * (xf * xf.conj())
+                    Sxx = Sxx[:int(len(filtered_signal) / 2)]
 
                     Sxx = np.maximum(Sxx.real, 1e-10)
+
+                    print(f'Filtered Sxx mean: {Sxx.mean()}')
 
                     df = 1 / T
                     fNQ = 1 / dt / 2
                     faxis = np.arange(0, fNQ, df)
 
+                    limit_index = np.where((faxis >= 12) & (faxis <= 30))[0]
+                    faxis_limited = faxis[limit_index]
+                    Sxx_limited = Sxx[limit_index]
+
+                    print(f'Filtered Sxx_limited mean: {Sxx_limited.mean()}')
+
                     ax.clear()
-                    ax.set_ylim([-60, 0])
-                    ax.plot(faxis, 10 * np.log10(Sxx.real / max(Sxx.real)))  
+                    ax.set_xlim([12, 30])
+
+                    if NORMALIZE_SXX:
+                        ax.set_ylim([-60, 0])
+                        ax.plot(faxis_limited, 10 * np.log10(Sxx_limited / np.max(Sxx_limited)))
+                    else:
+                        ax.set_ylim([-10, 500])
+                        ax.plot(faxis_limited, Sxx_limited)
+
+                    if X_AXIS_TYPE == 'log':
+                        ax.set_xscale('log')
+                    else:
+                        ax.set_xscale('linear')
+
                 return ax,
 
             ani = animation.FuncAnimation(fig, update_frequency, interval=1000)
@@ -186,13 +230,16 @@ class SessionManager:
             ax.set_ylabel('Frecuencia [Hz]')
 
             def update_spectrogram(frame):
-                if len(self.raw_data) >= GRAPH_INTERVAL:
-                    raw_values = np.array(self.raw_data[-GRAPH_INTERVAL:])
+                if (len(self.raw_data) >= GRAPH_INTERVAL):
+                    raw_values = np.array(self.raw_data[-self._data_count:])
+                    self._data_count = 0
                     Fs = SAMPLE_ATTEMPT_FREQ
                     f, t, Sxx = spectrogram(raw_values, fs=Fs, nperseg=int(Fs), noverlap=int(Fs*0.95))
+                    self.max_Sxx_value = max(self.max_Sxx_value, np.max(Sxx))
+                    print(self.max_Sxx_value)
                     ax.clear()
-                    ax.pcolormesh(t, f, 10*np.log10(Sxx), cmap='jet')
-                    ax.set_ylim([0, 100])
+                    pcm = ax.pcolormesh(t, f, 10 * np.log10(Sxx), cmap='jet', vmin=0, vmax=10 * np.log10(10000))
+                    ax.set_ylim([0, 30])
 
                 return ax,
 
